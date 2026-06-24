@@ -7,7 +7,7 @@ export const PAGE_TIMEOUT_MS = 8000;
 export const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // Bump when response shape changes — invalidates all existing cache entries.
-export const CACHE_VERSION = 'v2';
+export const CACHE_VERSION = 'v3';
 
 // Vinted brand IDs (vinted.de). Used as `brand_ids[]` filter on the search API.
 // To add a brand: search for it on vinted.de and inspect the network request to

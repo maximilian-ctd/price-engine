@@ -2,6 +2,8 @@ import { PAGES_PER_PLATFORM } from './config.mjs';
 import * as vinted from './scrapers/vinted.mjs';
 import * as ebay from './scrapers/ebay.mjs';
 import * as vestiaire from './scrapers/vestiaire.mjs';
+import * as farfetch from './scrapers/farfetch.mjs';
+import * as google from './scrapers/google.mjs';
 
 function dedupe(listings) {
   const seen = new Set();
@@ -34,14 +36,26 @@ async function scrapeVinted({ brand, productName, diag }) {
 }
 
 export async function scrapeAll({ brand, category, productName, diag }) {
-  const [vintedResult, ebayResult, vestiaireResult] = await Promise.all([
+  const wrapSingle = (promise) => promise.then(listings => ({
+    listings: dedupe(listings),
+    pagesScraped: 1,
+  }));
+
+  const [vintedResult, ebayResult, vestiaireResult, farfetchResult, googleResult] = await Promise.all([
     scrapeVinted({ brand, productName, diag }),
     runPages(page => ebay.scrapePage({ brand, productName, category, page, diag })),
-    // Vestiaire via ScraperAPI render is slow (~15-25s); single page is the safe choice.
-    vestiaire.scrapePage({ brand, productName, page: 1, diag }).then(listings => ({
-      listings: dedupe(listings),
-      pagesScraped: 1,
-    })),
+    // Vestiaire ScraperAPI render is slow (~15-25s) — single page is the safe choice.
+    wrapSingle(vestiaire.scrapePage({ brand, productName, page: 1, diag })),
+    // Farfetch single page returns ~10-30 retail items via ScraperAPI proxy.
+    wrapSingle(farfetch.scrapePage({ brand, productName, page: 1, diag })),
+    // Google Shopping structured endpoint returns ~40 cross-retailer results in one call.
+    wrapSingle(google.scrapeShopping({ brand, productName, diag })),
   ]);
-  return { vinted: vintedResult, ebay: ebayResult, vestiaire: vestiaireResult };
+  return {
+    vinted: vintedResult,
+    ebay: ebayResult,
+    vestiaire: vestiaireResult,
+    farfetch: farfetchResult,
+    google: googleResult,
+  };
 }

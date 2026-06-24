@@ -56,25 +56,24 @@ export default async (req) => {
     }
   }
 
-  const { vinted, ebay, vestiaire } = await scrapeAll({ brand, category, productName, diag });
+  const platforms = await scrapeAll({ brand, category, productName, diag });
+  const { vinted, ebay, vestiaire, farfetch, google } = platforms;
 
   const responseBody = {
-    vinted, ebay, vestiaire,
+    vinted, ebay, vestiaire, farfetch, google,
     meta: {
       query: { brand, category, productName },
       pagesPerPlatform: PAGES_PER_PLATFORM,
       durationMs: Date.now() - t0,
-      counts: {
-        vinted: vinted.listings.length,
-        ebay: ebay.listings.length,
-        vestiaire: vestiaire.listings.length,
-      },
+      counts: Object.fromEntries(
+        Object.entries(platforms).map(([k, v]) => [k, v.listings.length])
+      ),
       diagnostics: diag,
       cached: false,
     },
   };
 
-  const total = vinted.listings.length + ebay.listings.length + vestiaire.listings.length;
+  const total = Object.values(platforms).reduce((s, p) => s + p.listings.length, 0);
   if (store && total >= MIN_CACHEABLE_LISTINGS) {
     try { await writeCache(store, cacheKey, responseBody); }
     catch (e) { diag.push(`cache write failed: ${e.message}`); }

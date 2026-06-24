@@ -1,6 +1,14 @@
 # price-engine
 
-Standalone API that aggregates secondhand market prices from **Vinted**, **eBay**, and **Vestiaire Collective**.
+Standalone API that aggregates fashion prices across five sources:
+
+| Source              | Type      | Notes                                                    |
+| ------------------- | --------- | -------------------------------------------------------- |
+| **Vinted**          | C2C used  | Direct API with cookie bootstrap; HTML fallback          |
+| **eBay**            | mixed     | Direct fetch, ScraperAPI retry on 403/429                |
+| **Vestiaire**       | curated used | ScraperAPI render (CloudFlare)                        |
+| **Farfetch**        | retail new | ScraperAPI proxy (Akamai); EUR pricing                  |
+| **Google Shopping** | aggregator | ScraperAPI structured endpoint; ~40 results in one call |
 
 Deployed as a Netlify Function; CORS-enabled so any frontend can consume it.
 
@@ -29,10 +37,12 @@ At least one of `brand` or `productName` is required.
   "vinted":    { "listings": [...], "pagesScraped": 3 },
   "ebay":      { "listings": [...], "pagesScraped": 3 },
   "vestiaire": { "listings": [...], "pagesScraped": 1 },
+  "farfetch":  { "listings": [...], "pagesScraped": 1 },
+  "google":    { "listings": [...], "pagesScraped": 1 },
   "meta": {
     "query":        { "brand": "Hermès", "category": "Taschen", "productName": "Birkin 30" },
-    "counts":       { "vinted": 73, "ebay": 121, "vestiaire": 15 },
-    "durationMs":   14563,
+    "counts":       { "vinted": 73, "ebay": 121, "vestiaire": 15, "farfetch": 8, "google": 40 },
+    "durationMs":   16500,
     "cached":       false,
     "diagnostics":  ["vinted home: HTTP 200", "ebay p1: 60 items", "..."]
   }
@@ -47,9 +57,11 @@ Each listing has at minimum: `platform`, `title`, `price`, `currency`, `url`. So
 
 | Name              | Required        | Purpose                                                              |
 | ----------------- | --------------- | -------------------------------------------------------------------- |
-| `SCRAPER_API_KEY` | for Vestiaire   | [ScraperAPI](https://www.scraperapi.com/) key; without it Vestiaire 403s |
+| `SCRAPER_API_KEY` | for Vestiaire / Farfetch / Google | [ScraperAPI](https://www.scraperapi.com/) key |
 
-Without `SCRAPER_API_KEY` the function still returns Vinted + eBay data; Vestiaire listings will be empty and `meta.diagnostics` will report `"vestiaire: scraperapi DISABLED"`.
+Without `SCRAPER_API_KEY` the function still returns Vinted; eBay survives only when its IP isn't blocked (no fallback); Vestiaire/Farfetch/Google return empty and report `"<platform>: scraperapi DISABLED"` in `diagnostics`.
+
+**Cost per fresh search** (cache miss): ~2 credits (eBay retries) + 10 (Vestiaire render) + 1 (Farfetch) + 5 (Google) ≈ **18 credits**.
 
 ## Local development
 
@@ -88,8 +100,10 @@ netlify/functions/
     ├── orchestrator.mjs    # Runs all three platforms in parallel
     └── scrapers/
         ├── vinted.mjs      # Cookie bootstrap, API endpoint, HTML fallback
-        ├── ebay.mjs        # .s-card selectors (2024+) with .s-item fallback
-        └── vestiaire.mjs   # Via ScraperAPI render=true (CloudFlare bypass)
+        ├── ebay.mjs        # .s-card selectors (2024+); ScraperAPI retry on 403
+        ├── vestiaire.mjs   # ScraperAPI render=true (CloudFlare bypass)
+        ├── farfetch.mjs    # ScraperAPI proxy, /de/ catalog (EUR pricing)
+        └── google.mjs      # ScraperAPI structured Google Shopping endpoint
 ```
 
 Cache version (`CACHE_VERSION` in `config.mjs`) acts as a key prefix — bump it whenever the response shape changes to invalidate all entries at once.

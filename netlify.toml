@@ -1,0 +1,13 @@
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[functions."scrape-prices"]
+  timeout = 26
+
+# No static site — this project only exposes a function endpoint.
+# `publish = "public"` is set to satisfy Netlify; the dir contains only a
+# minimal index.html that documents the API.

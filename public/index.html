@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>price-engine</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; line-height: 1.5; color: #1a1a2e; }
+    code, pre { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-family: ui-monospace, Menlo, monospace; }
+    pre { padding: 12px; overflow-x: auto; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 16px; margin-top: 32px; }
+  </style>
+</head>
+<body>
+  <h1>price-engine</h1>
+  <p>API that aggregates secondhand market prices from Vinted, eBay, and Vestiaire Collective.</p>
+
+  <h2>Endpoint</h2>
+  <pre>POST /.netlify/functions/scrape-prices</pre>
+
+  <h2>Request body</h2>
+  <pre>{
+  "brand": "Hermès",
+  "category": "Taschen",
+  "productName": "Birkin 30",
+  "bypassCache": false
+}</pre>
+
+  <h2>Response shape</h2>
+  <pre>{
+  "vinted":    { "listings": [...], "pagesScraped": 3 },
+  "ebay":      { "listings": [...], "pagesScraped": 3 },
+  "vestiaire": { "listings": [...], "pagesScraped": 1 },
+  "meta": {
+    "counts":     { "vinted": 73, "ebay": 121, "vestiaire": 15 },
+    "durationMs": 14563,
+    "cached":     false,
+    "diagnostics": ["vinted home: HTTP 200", ...]
+  }
+}</pre>
+</body>
+</html>

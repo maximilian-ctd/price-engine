@@ -3,6 +3,36 @@ import { UA } from '../config.mjs';
 import { fetchWithTimeout } from '../http.mjs';
 import { parsePrice } from '../price-parser.mjs';
 
+const BROWSER_HEADERS = {
+  'User-Agent': UA,
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+  'Accept-Language': 'de-DE,de;q=0.9,en;q=0.5',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Upgrade-Insecure-Requests': '1',
+};
+
+async function fetchEbay(target, page, diag) {
+  // Try direct first (free). If blocked (403/429), retry via ScraperAPI when configured.
+  const direct = await fetchWithTimeout(target, { headers: BROWSER_HEADERS });
+  diag.push(`ebay p${page}: HTTP ${direct.status}`);
+  if (direct.ok) return direct;
+
+  const key = process.env.SCRAPER_API_KEY;
+  if (!key || ![403, 429].includes(direct.status)) return direct;
+
+  // ScraperAPI basic mode: 1 credit/req (no render). Cheap fallback for IP blocks.
+  const proxied = await fetchWithTimeout(
+    `https://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(target)}`,
+    { headers: { 'User-Agent': UA } },
+    15000
+  );
+  diag.push(`ebay p${page}: scraperapi retry HTTP ${proxied.status}`);
+  return proxied;
+}
+
 // eBay migrated from `.s-item` to `.s-card` in 2024. We try the new layout first
 // and fall back to the legacy one when no cards are matched.
 export async function scrapePage({ brand, productName, category, page, diag }) {
@@ -10,21 +40,7 @@ export async function scrapePage({ brand, productName, category, page, diag }) {
   const url = `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(q)}&_ipg=60&_pgn=${page}`;
 
   try {
-    const res = await fetchWithTimeout(url, {
-      headers: {
-        'User-Agent': UA,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'de-DE,de;q=0.9,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1',
-        'Cache-Control': 'max-age=0',
-      },
-    });
-    diag.push(`ebay p${page}: HTTP ${res.status}`);
+    const res = await fetchEbay(url, page, diag);
     if (!res.ok) return [];
     const html = await res.text();
     const $ = cheerio.load(html);

@@ -20,7 +20,7 @@ export async function scrapePage({ brand, productName, page, diag }) {
   try {
     const res = await fetchWithTimeout(url, {
       headers: { 'User-Agent': UA, 'Accept-Language': 'de-DE,de;q=0.9' },
-    }, scraperKey ? 24000 : PAGE_TIMEOUT_MS);
+    }, scraperKey ? 20000 : PAGE_TIMEOUT_MS);
     diag.push(`vestiaire p${page}: HTTP ${res.status}`);
     if (!res.ok) return [];
     const html = await res.text();

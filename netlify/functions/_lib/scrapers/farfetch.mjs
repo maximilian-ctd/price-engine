@@ -31,14 +31,16 @@ export async function scrapePage({ brand, productName, page, diag }) {
 
     $('[data-testid="product-card"]').each((_, el) => {
       const $el = $(el);
-      const brandText = $el.find('[data-testid="product-card-label-primary"]').first().text().trim();
-      const descText = $el.find('[data-testid="product-card-label-secondary"], [data-testid="product-card-description"]').first().text().trim();
+      // Farfetch uses data-component (not data-testid) for the actual brand/description.
+      // The data-testid="product-card-label-primary" is the "Neue Saison"/sale badge — not the title.
+      const brandText = $el.find('[data-component="ProductCardBrandName"]').first().text().trim();
+      const descText = $el.find('[data-component="ProductCardDescription"]').first().text().trim();
       const title = [brandText, descText].filter(Boolean).join(' — ').trim()
                  || $el.find('img').first().attr('alt')?.trim()
                  || '';
-      const price = parsePrice($el.find('[data-testid="product-card-price"]').first().text());
+      const price = parsePrice($el.find('[data-component="PriceBrief"], [data-testid="product-card-price"]').first().text());
       if (!price) return;
-      const href = $el.find('a').first().attr('href');
+      const href = $el.find('a[data-component="ProductCardLink"], a').first().attr('href');
       listings.push({
         platform: 'farfetch',
         title: title || 'Farfetch item',

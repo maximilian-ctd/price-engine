@@ -1,44 +1,171 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8">
-  <title>price-engine</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>price-engine — test</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; line-height: 1.5; color: #1a1a2e; }
-    code, pre { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; font-family: ui-monospace, Menlo, monospace; }
-    pre { padding: 12px; overflow-x: auto; }
-    h1 { font-size: 22px; }
-    h2 { font-size: 16px; margin-top: 32px; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif; max-width: 1100px; margin: 0 auto; padding: 24px; line-height: 1.5; color: #1a1a2e; background: #fafafa; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    h1 + p { color: #666; margin: 0 0 24px; font-size: 14px; }
+    form { display: grid; grid-template-columns: 2fr 2fr 1fr auto; gap: 12px; margin-bottom: 24px; padding: 16px; background: #fff; border-radius: 8px; border: 1px solid #e5e5e5; }
+    label { font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+    input, select { font: inherit; padding: 8px 10px; border: 1px solid #d0d0d0; border-radius: 6px; width: 100%; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    button { font: inherit; font-weight: 600; padding: 8px 18px; background: #1a1a2e; color: #fff; border: 0; border-radius: 6px; cursor: pointer; align-self: end; height: 38px; }
+    button:disabled { opacity: 0.5; cursor: wait; }
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .card { background: #fff; padding: 12px 16px; border-radius: 8px; border: 1px solid #e5e5e5; }
+    .card .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #888; }
+    .card .v { font-size: 22px; font-weight: 700; margin-top: 4px; }
+    .card.stat .v { color: #0a7d3b; }
+    .platforms { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .platforms .card .v { font-size: 18px; }
+    .platforms .card .sub { font-size: 12px; color: #666; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; border: 1px solid #e5e5e5; }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+    th { background: #f7f7f7; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #555; cursor: pointer; user-select: none; }
+    tr:hover td { background: #fafbff; }
+    .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: capitalize; }
+    .pl-vinted { background: #e6fafb; color: #07898f; }
+    .pl-ebay { background: #fde8ea; color: #c8242e; }
+    .pl-vestiaire { background: #e8e8f3; color: #1a1a2e; }
+    .pl-farfetch { background: #fff3d9; color: #8a6b00; }
+    .pl-google { background: #e3f0ff; color: #1565c0; }
+    .price { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .empty { text-align: center; color: #888; padding: 40px; font-style: italic; }
+    a { color: inherit; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .truncate { max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    details { margin-top: 24px; background: #fff; padding: 12px 16px; border-radius: 8px; border: 1px solid #e5e5e5; }
+    details summary { cursor: pointer; font-weight: 600; font-size: 13px; color: #555; }
+    details pre { font-size: 11px; max-height: 300px; overflow: auto; background: #f7f7f7; padding: 12px; border-radius: 6px; margin-top: 12px; }
+    .diag { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: #555; line-height: 1.6; }
+    .err { background: #fde8ea; color: #c8242e; padding: 12px 16px; border-radius: 8px; margin-bottom: 24px; }
   </style>
 </head>
 <body>
   <h1>price-engine</h1>
-  <p>API that aggregates secondhand market prices from Vinted, eBay, and Vestiaire Collective.</p>
+  <p>Marktpreis-Aggregator über Vinted, eBay, Vestiaire, Farfetch und Google Shopping.</p>
 
-  <h2>Endpoint</h2>
-  <pre>POST /.netlify/functions/scrape-prices</pre>
+  <form id="f">
+    <div class="field"><label>Marke</label><input id="brand" placeholder="z.B. Hermès" value="Hermès" required></div>
+    <div class="field"><label>Produkt</label><input id="productName" placeholder="z.B. Birkin 30" value="Birkin 30" required></div>
+    <div class="field"><label>Kategorie</label>
+      <select id="category">
+        <option value="">—</option>
+        <option>Taschen</option><option>Kleidung</option><option>Schuhe</option>
+        <option>Accessoires</option><option>Schmuck</option><option>Uhren</option>
+      </select>
+    </div>
+    <button id="btn">Suchen</button>
+  </form>
 
-  <h2>Request body</h2>
-  <pre>{
-  "brand": "Hermès",
-  "category": "Taschen",
-  "productName": "Birkin 30",
-  "bypassCache": false
-}</pre>
+  <div id="out"></div>
 
-  <h2>Response shape</h2>
-  <pre>{
-  "vinted":    { "listings": [...], "pagesScraped": 3 },
-  "ebay":      { "listings": [...], "pagesScraped": 3 },
-  "vestiaire": { "listings": [...], "pagesScraped": 1 },
-  "farfetch":  { "listings": [...], "pagesScraped": 1 },
-  "google":    { "listings": [...], "pagesScraped": 1 },
-  "meta": {
-    "counts":     { "vinted": 73, "ebay": 121, "vestiaire": 15, "farfetch": 8, "google": 40 },
-    "durationMs": 16500,
-    "cached":     false,
-    "diagnostics": ["vinted home: HTTP 200", ...]
-  }
-}</pre>
+  <script>
+    const f = document.getElementById('f');
+    const out = document.getElementById('out');
+    const btn = document.getElementById('btn');
+
+    function fmt(n) { return n == null ? '—' : new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(n) + ' €'; }
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+    f.addEventListener('submit', async e => {
+      e.preventDefault();
+      btn.disabled = true; btn.textContent = 'Lädt…';
+      out.innerHTML = '<div class="empty">Scrape läuft (5 Plattformen parallel, ~15s)…</div>';
+
+      const body = {
+        brand: document.getElementById('brand').value,
+        category: document.getElementById('category').value,
+        productName: document.getElementById('productName').value,
+      };
+      const t0 = performance.now();
+      try {
+        const res = await fetch('/.netlify/functions/scrape-prices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        const took = Math.round(performance.now() - t0);
+        render(data, took);
+      } catch (err) {
+        out.innerHTML = `<div class="err">Fehler: ${escapeHtml(err.message)}</div>`;
+      } finally {
+        btn.disabled = false; btn.textContent = 'Suchen';
+      }
+    });
+
+    function render(data, took) {
+      if (data.error) { out.innerHTML = `<div class="err">${escapeHtml(data.error)}</div>`; return; }
+
+      const platforms = ['vinted', 'ebay', 'vestiaire', 'farfetch', 'google'];
+      const all = platforms.flatMap(p => (data[p]?.listings || []).map(l => ({ ...l, platform: p })));
+
+      // Price stats with simple outlier filter
+      const prices = all.map(l => Number(l.price)).filter(p => p > 0 && p < 100000).sort((a, b) => a - b);
+      const q = (p) => prices[Math.floor(prices.length * p)] || 0;
+      const stats = prices.length
+        ? { count: prices.length, min: prices[0], max: prices[prices.length - 1], median: q(0.5), p25: q(0.25), p75: q(0.75) }
+        : null;
+
+      const counts = data.meta?.counts || {};
+      const cached = data.meta?.cached;
+      const ageMin = data.meta?.cacheAgeMinutes;
+
+      let html = '';
+
+      if (stats) {
+        html += `<div class="summary">
+          <div class="card stat"><div class="k">Median</div><div class="v">${fmt(stats.median)}</div></div>
+          <div class="card"><div class="k">25%-75%</div><div class="v">${fmt(stats.p25)} – ${fmt(stats.p75)}</div></div>
+          <div class="card"><div class="k">Min – Max</div><div class="v" style="font-size:14px">${fmt(stats.min)} – ${fmt(stats.max)}</div></div>
+          <div class="card"><div class="k">Listings</div><div class="v">${stats.count}</div></div>
+          <div class="card"><div class="k">${cached ? 'Cache (Age)' : 'Live (took)'}</div><div class="v" style="font-size:14px">${cached ? ageMin + ' min' : took + ' ms'}</div></div>
+        </div>`;
+      }
+
+      html += `<div class="platforms">`;
+      for (const p of platforms) {
+        const list = data[p]?.listings || [];
+        const cnt = counts[p] ?? list.length;
+        const avg = list.length ? Math.round(list.reduce((s, x) => s + Number(x.price || 0), 0) / list.length) : 0;
+        html += `<div class="card"><span class="badge pl-${p}">${p}</span>
+          <div class="v">${cnt} Listings</div>
+          <div class="sub">Ø ${fmt(avg)}</div></div>`;
+      }
+      html += `</div>`;
+
+      if (all.length === 0) {
+        html += `<div class="empty">Keine Listings gefunden.</div>`;
+      } else {
+        // Sort by price asc
+        all.sort((a, b) => Number(a.price) - Number(b.price));
+        html += `<table><thead><tr>
+          <th>Plattform</th><th>Titel</th><th>Quelle</th><th class="price">Preis</th>
+        </tr></thead><tbody>`;
+        for (const l of all) {
+          const link = l.url ? `<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${escapeHtml(l.title || '—')}</a>` : escapeHtml(l.title || '—');
+          html += `<tr>
+            <td><span class="badge pl-${l.platform}">${l.platform}</span></td>
+            <td class="truncate">${link}</td>
+            <td>${escapeHtml(l.source || l.brand || l.city || '')}</td>
+            <td class="price">${fmt(Number(l.price))}</td>
+          </tr>`;
+        }
+        html += `</tbody></table>`;
+      }
+
+      if (data.meta?.diagnostics?.length) {
+        html += `<details><summary>Diagnostics</summary><div class="diag">${data.meta.diagnostics.map(escapeHtml).join('<br>')}</div></details>`;
+      }
+      html += `<details><summary>Raw JSON</summary><pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre></details>`;
+
+      out.innerHTML = html;
+    }
+  </script>
 </body>
 </html>

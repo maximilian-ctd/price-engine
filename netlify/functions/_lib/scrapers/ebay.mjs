@@ -23,7 +23,14 @@ async function fetchEbay(target, page, diag) {
   const key = process.env.SCRAPER_API_KEY;
   if (!key || ![403, 429].includes(direct.status)) return direct;
 
-  // ScraperAPI basic mode: 1 credit/req (no render). Cheap fallback for IP blocks.
+  // Only retry page 1 via ScraperAPI — pages 2/3 are skipped to stay within the
+  // free plan's concurrency limit (5) shared with Vestiaire/Farfetch/Google.
+  // Page 1 still returns ~60 items which is plenty for pricing analysis.
+  if (page !== 1) {
+    diag.push(`ebay p${page}: skipped (page 2+ retries disabled to save ScraperAPI concurrency)`);
+    return direct;
+  }
+
   const proxied = await fetchWithTimeout(
     `https://api.scraperapi.com/?api_key=${key}&url=${encodeURIComponent(target)}`,
     { headers: { 'User-Agent': UA } },

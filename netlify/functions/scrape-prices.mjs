@@ -1,6 +1,10 @@
 import { scrapeAll } from './_lib/orchestrator.mjs';
-import { buildCacheKey, openStore, readCache, writeCache } from './_lib/cache.mjs';
+import {
+  buildCacheKey, openStore, readCache, writeCache,
+  openVestiaireStore, readVestiaireFallback, writeVestiaireFallback,
+} from './_lib/cache.mjs';
 import { PAGES_PER_PLATFORM } from './_lib/config.mjs';
+import { filterByBrand } from './_lib/relevance.mjs';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -29,7 +33,13 @@ export default async (req) => {
   try { body = await req.json(); }
   catch { return jsonResponse({ error: 'Invalid JSON' }, { status: 400 }); }
 
-  const { brand = '', category = '', productName = '', bypassCache = false } = body;
+  const {
+    brand = '',
+    category = '',
+    productName = '',
+    bypassCache = false,
+    strictBrand = true,   // default: drop listings whose title/brand doesn't match `brand`
+  } = body;
   if (!brand && !productName) {
     return jsonResponse({ error: 'brand or productName required' }, { status: 400 });
   }
@@ -38,6 +48,7 @@ export default async (req) => {
   const diag = [];
   const cacheKey = buildCacheKey({ brand, category, productName });
   const store = openStore();
+  const vestiaireStore = openVestiaireStore();
 
   if (store && !bypassCache) {
     try {
@@ -56,13 +67,46 @@ export default async (req) => {
     }
   }
 
-  const platforms = await scrapeAll({ brand, category, productName, diag });
+  const scraped = await scrapeAll({ brand, category, productName, diag });
+
+  // Vestiaire fallback: if live scrape returned nothing but we have a recent
+  // successful scrape in the fallback cache, use that instead of an empty result.
+  if (vestiaireStore) {
+    if (scraped.vestiaire.listings.length > 0) {
+      try { await writeVestiaireFallback(vestiaireStore, cacheKey, scraped.vestiaire.listings); }
+      catch (e) { diag.push(`vestiaire fallback write failed: ${e.message}`); }
+    } else {
+      try {
+        const fb = await readVestiaireFallback(vestiaireStore, cacheKey);
+        if (fb?.listings?.length) {
+          const ageDays = Math.round((Date.now() - fb.timestamp) / 86400000);
+          scraped.vestiaire = {
+            listings: fb.listings,
+            pagesScraped: 1,
+            fromFallback: true,
+            fallbackAgeDays: ageDays,
+          };
+          diag.push(`vestiaire: served ${fb.listings.length} items from fallback (${ageDays}d old)`);
+        }
+      } catch (e) {
+        diag.push(`vestiaire fallback read failed: ${e.message}`);
+      }
+    }
+  }
+
+  // Brand filter: drop irrelevant listings when strictBrand is true.
+  const platforms = strictBrand && brand
+    ? Object.fromEntries(
+        Object.entries(scraped).map(([k, v]) => [k, filterByBrand(v, brand, diag, k)])
+      )
+    : scraped;
+
   const { vinted, ebay, vestiaire, farfetch, google } = platforms;
 
   const responseBody = {
     vinted, ebay, vestiaire, farfetch, google,
     meta: {
-      query: { brand, category, productName },
+      query: { brand, category, productName, strictBrand },
       pagesPerPlatform: PAGES_PER_PLATFORM,
       durationMs: Date.now() - t0,
       counts: Object.fromEntries(
